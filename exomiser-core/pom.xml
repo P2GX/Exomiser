@@ -36,6 +36,11 @@
         <arrow.version>18.2.0</arrow.version>
     </properties>
     <dependencies>
+        <dependency>
+            <groupId>com.github.p2gx.boqa</groupId>
+            <artifactId>boqa-core</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
         <!--Jannovar is used for providing known gene annotations on variants -->
         <dependency>
             <groupId>de.charite.compbio</groupId>
