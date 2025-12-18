@@ -36,6 +36,8 @@ public enum PriorityType {
     PHIVE_PRIORITY,
     //Prioritises against OMIM data
     OMIM_PRIORITY,
+    // Bayesian Ontology Query Algorithm
+    BOQA_PRIORITY,
     //None - for when you don't want to run any prioritisation
     NONE
 
