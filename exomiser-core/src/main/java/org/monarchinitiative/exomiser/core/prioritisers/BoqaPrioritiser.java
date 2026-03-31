@@ -27,6 +27,7 @@ public class BoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
     private final Counter counter;
     private final double alpha;
     private final double beta;
+    private final double temperature;
 
     public BoqaPrioritiser(PriorityService priorityService, Counter counter) {
         // TODO: add getCounter(): Counter to Priority Service, then initialise the Counter @Lazy in the exomiser-config
@@ -35,8 +36,9 @@ public class BoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
         // it. The Counter now takes ~ 300ms to create, but still, it would be best to move it's creation into the config code.
         this.priorityService = priorityService;
         this.counter = counter;
-        this.alpha = 1.0/19077; // TODO: Make alpha and beta constructor parameters
+        this.alpha = 1.0/19077; // TODO: Make alpha, beta and temperature constructor parameters
         this.beta = 0.9;
+        this.temperature = 1.0; // default
     }
 
     @Override
@@ -49,11 +51,20 @@ public class BoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
         logger.info("Running BOQA prioritiser...");
         var observedHpoIds = hpoIds.stream().map(TermId::of).collect(toUnmodifiableSet());
         PatientData patientData = new ExomiserPatientData(observedHpoIds, Collections.emptySet());
-        AlgorithmParameters params = AlgorithmParameters.create(alpha, beta);
-        BoqaAnalysisResult boqaAnalysisResult = BoqaPatientAnalyzer.computeBoqaResultsRawLog(patientData, counter, params);
-        List<BoqaResult> rescaledBoqaResults = reScaledRawLogBoqaExomiserScores(boqaAnalysisResult.boqaResults());
-        logger.debug("Top 10 BOQA results:");
-        rescaledBoqaResults.stream().sorted(Comparator.comparing(BoqaResult::boqaScore)).limit(10).forEach(b -> logger.debug("BOQA score: {} {} {}", b.counts().diseaseId(), b.boqaScore(), b.counts().diseaseLabel()));
+        AlgorithmParameters params = AlgorithmParameters.create(alpha, beta, temperature);
+        double epsilon = 0.000001d;
+        List<BoqaResult> rescaledBoqaResults;
+        BoqaAnalysisResult boqaAnalysisResult;
+        if((Math.abs(1.0 - temperature) < epsilon)) {
+            boqaAnalysisResult = BoqaPatientAnalyzer.computeBoqaResultsRawLog(patientData, counter, params);
+            rescaledBoqaResults = reScaledRawLogBoqaExomiserScores(boqaAnalysisResult.boqaResults());
+            logger.debug("Top 10 BOQA results:");
+            rescaledBoqaResults.stream().sorted(Comparator.comparing(BoqaResult::boqaScore)).limit(10).forEach(b -> logger.debug("BOQA score: {} {} {}", b.counts().diseaseId(), b.boqaScore(), b.counts().diseaseLabel()));
+        } else {
+            boqaAnalysisResult = BoqaPatientAnalyzer.computeBoqaResults(
+                    patientData, counter, Integer.MAX_VALUE, params);
+            rescaledBoqaResults = boqaAnalysisResult.boqaResults().stream().toList();
+        }
         Map<String, BoqaResult> boqaResultsByDiseaseId = rescaledBoqaResults.stream()
                 .collect(toUnmodifiableMap(boqaResult -> boqaResult.counts().diseaseId(), Function.identity()));
         return genes.stream().map(prioritiseGene(boqaResultsByDiseaseId));
