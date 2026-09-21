@@ -8,29 +8,24 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.monarchinitiative.exomiser.core.model.Gene;
-import org.monarchinitiative.exomiser.core.model.GeneScore;
 import org.monarchinitiative.exomiser.core.prioritisers.model.Disease;
 import org.monarchinitiative.exomiser.core.prioritisers.model.InheritanceMode;
 import org.monarchinitiative.exomiser.core.prioritisers.service.PriorityService;
 import org.monarchinitiative.phenol.annotations.formats.hpo.HpoDiseases;
 import org.monarchinitiative.phenol.ontology.data.Ontology;
-import org.p2gx.boqa.core.Counter;
+import org.monarchinitiative.phenol.ontology.data.TermId;
 import org.p2gx.boqa.core.DiseaseData;
 import org.p2gx.boqa.core.PatientData;
 import org.p2gx.boqa.core.algorithm.AlgorithmParameters;
-import org.p2gx.boqa.core.algorithm.BoqaSetCounter;
-import org.p2gx.boqa.core.analysis.BoqaAnalysisResult;
 import org.p2gx.boqa.core.analysis.BoqaBlendedExomiserAnalyser;
 import org.p2gx.boqa.core.analysis.BoqaPatientAnalyzer;
 import org.p2gx.boqa.core.analysis.BoqaResult;
-import org.p2gx.boqa.core.diseases.CandidateResult;
-import org.p2gx.boqa.core.diseases.DiseaseComponent;
+import org.p2gx.boqa.core.analysis.CandidateResult;
 import org.p2gx.boqa.core.diseases.DiseaseDataPhenolIngest;
 import org.p2gx.boqa.core.diseases.TargetDisease;
 import org.slf4j.Logger;
@@ -50,7 +45,6 @@ public class BlendedBoqaPrioriser implements Prioritiser<BoqaPriorityResult> {
     private final PriorityService priorityService;
     private final Ontology hpo;
     private final HpoDiseases hpoDiseases;
-    private final Counter counter;
     private final static Double GENE_SCORE_THRESHOLD = 0.90;
     /** A map of the genes related to our candidate diseases for blended analysis. The Key is the gene symbol. */
     private final Map<String, Gene> geneMap;
@@ -62,7 +56,6 @@ public class BlendedBoqaPrioriser implements Prioritiser<BoqaPriorityResult> {
         this.hpoDiseases = diseases;
         geneMap = new HashMap<>();
         DiseaseData diseaseData = DiseaseDataPhenolIngest.of(hpo, diseases);
-        this.counter = new BoqaSetCounter(diseaseData, hpo);
     }
 
     /**
@@ -96,14 +89,16 @@ public class BlendedBoqaPrioriser implements Prioritiser<BoqaPriorityResult> {
      * @param genes the list of {@link Gene} objects to evaluate
      * @return a list of qualified {@link TargetDisease} candidates
      */
-    private List<TargetDisease> getCandidateDiseases(List<Gene> genes) {
+    private List<TargetDisease.PhenotypeAndGene> getCandidateDiseases(List<Gene> genes) {
         return genes.stream()
             .flatMap(gene -> priorityService.getDiseaseDataAssociatedWithGeneId(gene.entrezGeneId()).stream()
                 .flatMap(d -> d.inheritanceMode().toModeOfInheritance().stream()
                     .filter(moi -> geneCompatibleWithInheritanceMode(gene, d.inheritanceMode(), moi))
                     .filter(moi -> gene.geneScoreForMode(moi).combinedScore() > GENE_SCORE_THRESHOLD)
                     .peek(moi -> this.geneMap.put(gene.geneSymbol(), gene))
-                    .map(moi -> new TargetDisease(d.diseaseId(), d.diseaseName(), gene.geneId(), gene.geneSymbol()))
+                    .map(moi -> new TargetDisease.PhenotypeAndGene(
+                            d.diseaseId(), d.diseaseName(), gene.geneId(), gene.geneSymbol(),
+                            d.phenotypeIds().stream().map(TermId::of).collect(Collectors.toSet())))
                 )
             )
             .toList();
@@ -129,27 +124,19 @@ public class BlendedBoqaPrioriser implements Prioritiser<BoqaPriorityResult> {
     public List<BlendedGeneResult> blend(List<String> hpoIds, List<Gene> genes) {
         List<BlendedGeneResult> blendedResults = new ArrayList<>();
         // 1. Find genes with candidate pathogenic variants
-        List<TargetDisease> candidates = getCandidateDiseases(genes);
+        List<TargetDisease.PhenotypeAndGene> targetDiseaseList = getCandidateDiseases(genes);
         BoqaBlendedExomiserAnalyser bbqAnalyser = new BoqaBlendedExomiserAnalyser(hpo, hpoDiseases);
         PatientData patientData = PatientData.fromObservedHpoTermList(hpoIds);
-        List<CandidateResult> candidateResults = bbqAnalyser.computeBlendedBoqaResults(patientData, candidates);
-        int singeDiseasesReturned = 0;
-        for (CandidateResult cresult: candidateResults) {
-            switch (cresult) {
-                case CandidateResult.Single(DiseaseComponent dc) -> {
-                    singeDiseasesReturned++; // We do not show single diseases
-                }
-                case CandidateResult.Blended(List<DiseaseComponent> components,DiseaseComponent finalDiseaseModel) -> {
-                    List<Gene> relevantGenes = components.stream()
-                        .map(dc -> this.geneMap.get(dc.disease().geneSymbol()))
-                        .filter(java.util.Objects::nonNull)
-                        .toList();
-                    BlendedGeneResult bgr = new BlendedGeneResult(relevantGenes, cresult);
-                    blendedResults.add(bgr);
-                }
-            }
-        }
-        System.out.printf("BOQA returned %d single gene results", singeDiseasesReturned);
+        List<CandidateResult> candidateResults = bbqAnalyser.computeBlendedBoqaResults(
+                patientData, targetDiseaseList);
+        Map<Class<? extends CandidateResult>, Long> counts = candidateResults.stream()
+                .collect(Collectors.groupingBy(CandidateResult::getClass, Collectors.counting()));
+        counts.forEach((type, count) ->
+                LOGGER.info("Number of {}: {}", type.getSimpleName(), count));
+        // TODO CandidateResult may also need to expose IDs etc just like CandidateDiagnosis
+        //  or there is some overalp and we need fewer classes
+        // from geneMap get Gene objects associated to each CandidateResult
+        //blendedResults = candidateResults.stream().map(CandidateResult.BlendedResult)
         return blendedResults;
     }
    
