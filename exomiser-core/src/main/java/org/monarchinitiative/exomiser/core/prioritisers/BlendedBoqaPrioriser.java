@@ -55,7 +55,6 @@ public class BlendedBoqaPrioriser implements Prioritiser<BoqaPriorityResult> {
         this.hpo = hpo;
         this.hpoDiseases = diseases;
         geneMap = new HashMap<>();
-        DiseaseData diseaseData = DiseaseDataPhenolIngest.of(hpo, diseases);
     }
 
     /**
@@ -121,7 +120,7 @@ public class BlendedBoqaPrioriser implements Prioritiser<BoqaPriorityResult> {
      * @param genes  a list of {@link Gene} objects to be evaluated as candidates
      * @return a list of {@link BlendedGeneResult} containing the relevant genes and their BOQA results
      */
-    public List<BlendedGeneResult> blend(List<String> hpoIds, List<Gene> genes) {
+    public List<BlendedGeneResult> run_blended(List<String> hpoIds, List<Gene> genes) {
         List<BlendedGeneResult> blendedResults = new ArrayList<>();
         // 1. Find genes with candidate pathogenic variants
         List<TargetDisease.PhenotypeAndGene> targetDiseaseList = getCandidateDiseases(genes);
@@ -136,7 +135,13 @@ public class BlendedBoqaPrioriser implements Prioritiser<BoqaPriorityResult> {
         // TODO CandidateResult may also need to expose IDs etc just like CandidateDiagnosis
         //  or there is some overalp and we need fewer classes
         // from geneMap get Gene objects associated to each CandidateResult
-        //blendedResults = candidateResults.stream().map(CandidateResult.BlendedResult)
+        candidateResults.forEach(c -> {
+            List<Gene> diseaseGenes = c.finalDiseases()
+                    .stream()
+                    .map(TargetDisease::diseaseId)
+                    .map(geneMap::get).toList();
+            blendedResults.add(new BlendedGeneResult(diseaseGenes, c));
+        });
         return blendedResults;
     }
    
