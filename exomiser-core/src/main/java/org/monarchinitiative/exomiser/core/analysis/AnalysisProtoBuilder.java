@@ -294,6 +294,11 @@ public class AnalysisProtoBuilder implements FluentAnalysisBuilder<AnalysisProto
         builder.addSteps(stepBuilder().setBoqaPrioritiser(PrioritisersProto.BoqaPrioritiser.getDefaultInstance()));
         return this;
     }
+    @Override
+    public AnalysisProtoBuilder addBlendedBoqaPrioritiser() {
+        builder.addSteps(stepBuilder().setBoqaPrioritiser(PrioritisersProto.BoqaPrioritiser.getDefaultInstance()));
+        return this;
+    }
 
     public AnalysisProtoBuilder addAnalysisStep(AnalysisProto.AnalysisStep analysisStep) {
         builder.addSteps(analysisStep);

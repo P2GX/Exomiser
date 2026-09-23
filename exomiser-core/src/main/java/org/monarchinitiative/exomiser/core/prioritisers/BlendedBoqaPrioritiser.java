@@ -1,29 +1,20 @@
 package org.monarchinitiative.exomiser.core.prioritisers;
 
-import static java.util.stream.Collectors.toUnmodifiableMap;
-
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.monarchinitiative.exomiser.core.model.Gene;
-import org.monarchinitiative.exomiser.core.prioritisers.model.Disease;
 import org.monarchinitiative.exomiser.core.prioritisers.model.InheritanceMode;
 import org.monarchinitiative.exomiser.core.prioritisers.service.PriorityService;
 import org.monarchinitiative.phenol.annotations.formats.hpo.HpoDiseases;
 import org.monarchinitiative.phenol.ontology.data.Ontology;
 import org.monarchinitiative.phenol.ontology.data.TermId;
 import org.p2gx.boqa.core.PatientData;
-import org.p2gx.boqa.core.algorithm.AlgorithmParameters;
 import org.p2gx.boqa.core.analysis.BoqaBlendedExomiserAnalyser;
-import org.p2gx.boqa.core.analysis.BoqaPatientAnalyzer;
-import org.p2gx.boqa.core.analysis.BoqaResult;
 import org.p2gx.boqa.core.analysis.CandidateResult;
 import org.p2gx.boqa.core.diseases.TargetDisease;
 import org.slf4j.Logger;
@@ -38,7 +29,7 @@ import de.charite.compbio.jannovar.mendel.ModeOfInheritance;
  * library. Given our decision not to add the blended diseases to the "main" output
  * of Exomiser, we could move the code that is shown here to some other place.
  */
-public class BlendedBoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
+public class BlendedBoqaPrioritiser implements Prioritiser<BlendedBoqaPriorityResult> {
     private static final Logger LOGGER = LoggerFactory.getLogger(BlendedBoqaPrioritiser.class);
     private final PriorityService priorityService;
     private final Ontology hpo;
@@ -50,24 +41,9 @@ public class BlendedBoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
 
     public BlendedBoqaPrioritiser(PriorityService priorityService, Ontology hpo, HpoDiseases diseases) {
         this.priorityService = priorityService;
-        priorityService.getAllDiseaseData()
         this.hpo = hpo;
         this.hpoDiseases = diseases;
         geneMap = new HashMap<>();
-    }
-
-    /**
-     * We return one of thiese objects for each blended diseases that is better than its best component single disease. 
-     * The genes list will allow us to show some variants etc., and the CandidateResult has all of the details coming
-     * from BOQA.
-     * @param genes
-     * @param result
-     */
-    record BlendedGeneResult(
-        List<Gene> genes,
-        CandidateResult result
-    ) {
-
     }
 
    /**
@@ -117,10 +93,11 @@ public class BlendedBoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
      *
      * @param hpoIds a list of strings representing the patient's observed HPO phenotype IDs
      * @param genes  a list of {@link Gene} objects to be evaluated as candidates
-     * @return a list of {@link BlendedGeneResult} containing the relevant genes and their BOQA results
+     * @return a list of {@link BlendedBoqaPriorityResult} containing the relevant genes and their BOQA results
      */
-    public List<BlendedGeneResult> run_blended(List<String> hpoIds, List<Gene> genes) {
-        List<BlendedGeneResult> blendedResults = new ArrayList<>();
+    @Override
+    public Stream<BlendedBoqaPriorityResult> prioritise(List<String> hpoIds, List<Gene> genes) {
+        List<BlendedBoqaPriorityResult> blendedResults = new ArrayList<>();
         // 1. Find genes with candidate pathogenic variants
         List<TargetDisease.PhenotypeAndGene> targetDiseaseList = getCandidateDiseases(genes);
         BoqaBlendedExomiserAnalyser bbqAnalyser = new BoqaBlendedExomiserAnalyser(hpo, hpoDiseases);
@@ -136,30 +113,15 @@ public class BlendedBoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
                     .stream()
                     .map(TargetDisease::diseaseId)
                     .map(geneMap::get).toList();
-            blendedResults.add(new BlendedGeneResult(diseaseGenes, c));
+            blendedResults.add(new BlendedBoqaPriorityResult(diseaseGenes, c));
         });
-        return blendedResults;
+        return blendedResults.stream();
     }
-   
 
-    /**
-     * This method is implementing the "normal" BOQA algorithm. In principle, we could use
-     * and prioritizer, and the Blended BOQA would be an add-on.
-     */
-    @SuppressWarnings("null")
+
     @Override
-    public Stream<BoqaPriorityResult> prioritise(List<String> hpoIds, List<Gene> genes) {
-        LOGGER.info("Running Blended BOQA prioritiser...");
-        PatientData patientData = PatientData.fromObservedHpoTermList(hpoIds);
-        AlgorithmParameters params = AlgorithmParameters.defaultParams();
-       // BoqaAnalysisResult boqaAnalysisResult = BoqaPatientAnalyzer.computeBoqaResultsRescaled(patientData, counter, params);
-        List<BoqaResult> rescaledBoqaResults = BoqaPatientAnalyzer.computeBoqaResultsRescaled(patientData, counter, params);
-        // reScaledRawLogBoqaExomiserScores(boqaAnalysisResult.boqaResults());
-        LOGGER.debug("Top 10 BOQA results:");
-        rescaledBoqaResults.stream().sorted(Comparator.comparing(BoqaResult::boqaScore)).limit(10).forEach(b -> LOGGER.debug("BOQA score: {} {} {}", b.counts().diseaseId(), b.boqaScore(), b.counts().diseaseLabel()));
-        Map<String, BoqaResult> boqaResultsByDiseaseId = rescaledBoqaResults.stream()
-                .collect(toUnmodifiableMap(boqaResult -> boqaResult.counts().diseaseId(), Function.identity()));
-        return genes.stream().map(prioritiseGene(boqaResultsByDiseaseId));
+    public PriorityType priorityType() {
+        return PriorityType.BLENDED_BOQA_PRIORITY;
     }
 
       /**
@@ -167,35 +129,29 @@ public class BlendedBoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
      * We should probably refactor to leave only this prioritiser
      * and make the Blended part an option
      **/
-    @SuppressWarnings("null")
-    private Function<Gene, BoqaPriorityResult> prioritiseGene(Map<String, BoqaResult> boqaResultsByDiseaseId) {
-        return gene -> {
-            List<Disease> diseases = priorityService.getDiseaseDataAssociatedWithGeneId(gene.entrezGeneId());
-            // Apart from very few exceptions, all diseases witth an OMIM id have just one associated gene
-            Map<Disease, BoqaResult> map = diseases.stream()
-                .filter(disease -> disease.id().startsWith("OMIM"))
-                .filter(disease -> boqaResultsByDiseaseId.containsKey(disease.diseaseId()))
-                .collect(Collectors.toMap(
-                    disease -> disease,
-                    disease -> boqaResultsByDiseaseId.get(disease.diseaseId())));
-                Map<Disease, BoqaResult> boqaResults = Collections.unmodifiableMap(map);
-            double score = boqaResults.values().stream()
-                .mapToDouble(BoqaResult::boqaScore)
-                .max()
-                .orElse(0d);
-            BoqaPriorityResult boqaPriorityResult = new BoqaPriorityResult(gene.entrezGeneId(), gene.geneSymbol(),
-                    score, boqaResults);
-            LOGGER.trace("BOQA score for {} is {} {}", gene.geneSymbol(), score, boqaResults);
-            return boqaPriorityResult;
-        };
-    }
+//    @SuppressWarnings("null")
+//    private Function<Gene, BoqaPriorityResult> prioritiseGene(Map<String, BoqaResult> boqaResultsByDiseaseId) {
+//        return gene -> {
+//            List<Disease> diseases = priorityService.getDiseaseDataAssociatedWithGeneId(gene.entrezGeneId());
+//            // Apart from very few exceptions, all diseases witth an OMIM id have just one associated gene
+//            Map<Disease, BoqaResult> map = diseases.stream()
+//                .filter(disease -> disease.id().startsWith("OMIM"))
+//                .filter(disease -> boqaResultsByDiseaseId.containsKey(disease.diseaseId()))
+//                .collect(Collectors.toMap(
+//                    disease -> disease,
+//                    disease -> boqaResultsByDiseaseId.get(disease.diseaseId())));
+//                Map<Disease, BoqaResult> boqaResults = Collections.unmodifiableMap(map);
+//            double score = boqaResults.values().stream()
+//                .mapToDouble(BoqaResult::boqaScore)
+//                .max()
+//                .orElse(0d);
+//            BoqaPriorityResult boqaPriorityResult = new BoqaPriorityResult(gene.entrezGeneId(), gene.geneSymbol(),
+//                    score, boqaResults);
+//            LOGGER.trace("BOQA score for {} is {} {}", gene.geneSymbol(), score, boqaResults);
+//            return boqaPriorityResult;
+//        };
+//    }
 
-
-
-    @Override
-    public PriorityType priorityType() {
-        return PriorityType.BOQA_PRIORITY;
-    }
 
     /** Taken from the OMIM prioritiser */
       private boolean geneCompatibleWithInheritanceMode(Gene gene, InheritanceMode inheritanceMode, ModeOfInheritance currentMode) {

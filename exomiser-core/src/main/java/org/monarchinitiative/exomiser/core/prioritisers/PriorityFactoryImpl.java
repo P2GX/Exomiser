@@ -92,11 +92,11 @@ public class PriorityFactoryImpl implements PriorityFactory {
 
     @Override
     public BoqaPrioritiser makeBoqaPrioritiser() {
-        return new BoqaPrioritiser(priorityService);
+        return new BoqaPrioritiser(priorityService, hpoOntology, hpoDiseases);
     }
 
     @Override
     public BlendedBoqaPrioritiser makeBlendedBoqaPrioritiser() {
-        return new BlendedBoqaPrioritiser(priorityService, hpoOntology());
+        return new BlendedBoqaPrioritiser(priorityService, hpoOntology, hpoDiseases);
     }
 }
