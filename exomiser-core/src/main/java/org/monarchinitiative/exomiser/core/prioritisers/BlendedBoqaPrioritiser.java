@@ -19,14 +19,12 @@ import org.monarchinitiative.exomiser.core.prioritisers.service.PriorityService;
 import org.monarchinitiative.phenol.annotations.formats.hpo.HpoDiseases;
 import org.monarchinitiative.phenol.ontology.data.Ontology;
 import org.monarchinitiative.phenol.ontology.data.TermId;
-import org.p2gx.boqa.core.DiseaseData;
 import org.p2gx.boqa.core.PatientData;
 import org.p2gx.boqa.core.algorithm.AlgorithmParameters;
 import org.p2gx.boqa.core.analysis.BoqaBlendedExomiserAnalyser;
 import org.p2gx.boqa.core.analysis.BoqaPatientAnalyzer;
 import org.p2gx.boqa.core.analysis.BoqaResult;
 import org.p2gx.boqa.core.analysis.CandidateResult;
-import org.p2gx.boqa.core.diseases.DiseaseDataPhenolIngest;
 import org.p2gx.boqa.core.diseases.TargetDisease;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +38,8 @@ import de.charite.compbio.jannovar.mendel.ModeOfInheritance;
  * library. Given our decision not to add the blended diseases to the "main" output
  * of Exomiser, we could move the code that is shown here to some other place.
  */
-public class BlendedBoqaPrioriser implements Prioritiser<BoqaPriorityResult> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(BlendedBoqaPrioriser.class);
+public class BlendedBoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BlendedBoqaPrioritiser.class);
     private final PriorityService priorityService;
     private final Ontology hpo;
     private final HpoDiseases hpoDiseases;
@@ -50,8 +48,9 @@ public class BlendedBoqaPrioriser implements Prioritiser<BoqaPriorityResult> {
     private final Map<String, Gene> geneMap;
 
 
-    public BlendedBoqaPrioriser(PriorityService priorityService, Ontology hpo, HpoDiseases diseases) {
+    public BlendedBoqaPrioritiser(PriorityService priorityService, Ontology hpo, HpoDiseases diseases) {
         this.priorityService = priorityService;
+        priorityService.getAllDiseaseData()
         this.hpo = hpo;
         this.hpoDiseases = diseases;
         geneMap = new HashMap<>();
@@ -132,9 +131,6 @@ public class BlendedBoqaPrioriser implements Prioritiser<BoqaPriorityResult> {
                 .collect(Collectors.groupingBy(CandidateResult::getClass, Collectors.counting()));
         counts.forEach((type, count) ->
                 LOGGER.info("Number of {}: {}", type.getSimpleName(), count));
-        // TODO CandidateResult may also need to expose IDs etc just like CandidateDiagnosis
-        //  or there is some overalp and we need fewer classes
-        // from geneMap get Gene objects associated to each CandidateResult
         candidateResults.forEach(c -> {
             List<Gene> diseaseGenes = c.finalDiseases()
                     .stream()

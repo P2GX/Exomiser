@@ -63,6 +63,6 @@ public class NoneTypePriorityFactoryStub implements PriorityFactory {
 
     @Override
     public BoqaPrioritiser makeBoqaPrioritiser() {
-        return new BoqaPrioritiser(TestPriorityServiceFactory.stubPriorityService(), new BoqaCounterStub());
+        return new BoqaPrioritiser(TestPriorityServiceFactory.stubPriorityService());
     }
 }

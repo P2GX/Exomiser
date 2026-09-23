@@ -8,7 +8,6 @@ import org.p2gx.boqa.core.Counter;
 import org.p2gx.boqa.core.DiseaseData;
 import org.p2gx.boqa.core.PatientData;
 import org.p2gx.boqa.core.algorithm.AlgorithmParameters;
-import org.p2gx.boqa.core.analysis.BoqaAnalysisResult;
 import org.p2gx.boqa.core.analysis.BoqaPatientAnalyzer;
 import org.p2gx.boqa.core.analysis.BoqaResult;
 import org.slf4j.Logger;
@@ -24,19 +23,13 @@ public class BoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
     private static final Logger logger = LoggerFactory.getLogger(BoqaPrioritiser.class);
 
     private final PriorityService priorityService;
-    private final Counter counter;
-    private final double alpha;
-    private final double beta;
 
-    public BoqaPrioritiser(PriorityService priorityService, Counter counter) {
+    public BoqaPrioritiser(PriorityService priorityService) {
         // TODO: add getCounter(): Counter to Priority Service, then initialise the Counter @Lazy in the exomiser-config
         // or make a @Lazy Counter bean to inject along with the Priority Service in the PriorityFactoryImpl
         // The Counter takes about 1 minute to create, so we only want to do that once and only if we really want to use
         // it. The Counter now takes ~ 300ms to create, but still, it would be best to move it's creation into the config code.
         this.priorityService = priorityService;
-        this.counter = counter;
-        this.alpha = 0.01916; // TODO: Make alpha and beta constructor parameters
-        this.beta = 0.65;
     }
 
     @Override
@@ -49,7 +42,7 @@ public class BoqaPrioritiser implements Prioritiser<BoqaPriorityResult> {
         logger.info("Running BOQA prioritiser...");
         var observedHpoIds = hpoIds.stream().map(TermId::of).collect(toUnmodifiableSet());
         PatientData patientData = new ExomiserPatientData(observedHpoIds, Collections.emptySet());
-        AlgorithmParameters params = AlgorithmParameters.create(alpha, beta);
+        AlgorithmParameters params = AlgorithmParameters.defaultParams();
         BoqaAnalysisResult boqaAnalysisResult = BoqaPatientAnalyzer.computeBoqaResultsRawLog(patientData, counter, params);
         List<BoqaResult> rescaledBoqaResults = reScaledRawLogBoqaExomiserScores(boqaAnalysisResult.boqaResults());
         logger.debug("Top 10 BOQA results:");

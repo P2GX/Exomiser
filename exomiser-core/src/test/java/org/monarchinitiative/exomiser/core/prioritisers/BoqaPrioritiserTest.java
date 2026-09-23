@@ -15,19 +15,14 @@ import org.monarchinitiative.exomiser.core.prioritisers.dao.DefaultDiseaseDao;
 import org.monarchinitiative.exomiser.core.prioritisers.service.ModelServiceImpl;
 import org.monarchinitiative.exomiser.core.prioritisers.service.PriorityService;
 import org.p2gx.boqa.core.Counter;
-import org.p2gx.boqa.core.PatientData;
-import org.p2gx.boqa.core.algorithm.BoqaCounts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Set;
 
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = {
@@ -89,7 +84,7 @@ class BoqaPrioritiserTest {
     @Disabled("Non-functional and useless")
     @Test
     void testPrioritise() {
-        BoqaPrioritiser instance = new BoqaPrioritiser(priorityService, counter);
+        BoqaPrioritiser instance = new BoqaPrioritiser(priorityService);
         List<String> patientPhenotypes = patientHpoIds();
         List<Gene> genes = buildGenes();
         List<BoqaPriorityResult> results = instance.prioritise(patientPhenotypes, genes).peek(System.out::println).toList();

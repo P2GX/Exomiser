@@ -59,7 +59,7 @@ class ExomiserTest {
 
     private final GenomeAnalysisServiceProvider genomeAnalysisServiceProvider = new GenomeAnalysisServiceProvider(TestFactory
             .buildDefaultHg19GenomeAnalysisService());
-    private final PriorityFactory priorityFactory = new PriorityFactoryImpl(TestPriorityServiceFactory.testPriorityService(), DataMatrix.empty(), null, new BoqaCounterStub());
+    private final PriorityFactory priorityFactory = new PriorityFactoryImpl(TestPriorityServiceFactory.testPriorityService(), DataMatrix.empty(), null);
     private final OntologyService ontologyService = TestOntologyService.builder().build();
 
     private final AnalysisFactory analysisFactory = new AnalysisFactory(genomeAnalysisServiceProvider, priorityFactory, ontologyService);
