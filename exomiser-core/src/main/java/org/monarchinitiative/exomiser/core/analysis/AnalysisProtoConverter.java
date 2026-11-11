@@ -45,6 +45,7 @@ public class AnalysisProtoConverter implements ProtoConverter<Analysis, Analysis
                 .putAllInheritanceModes(analysis.inheritanceModeOptions().getMaxFreqs().entrySet().stream().collect(Collectors.toMap(subModeOfInheritanceFloatEntry -> subModeOfInheritanceFloatEntry.getKey().toString(), Map.Entry::getValue)))
                 .addAllFrequencySources(analysis.frequencySources().stream().map(Objects::toString).toList())
                 .addAllPathogenicitySources(analysis.pathogenicitySources().stream().map(Objects::toString).toList())
+                .setPostScoringBlendedBoqa(analysis.postScoringBlendedBoqa())
                 .addAllSteps(analysis.analysisSteps().stream().map(analysisStepToProto()).filter(Objects::nonNull).toList())
                 .build();
     }

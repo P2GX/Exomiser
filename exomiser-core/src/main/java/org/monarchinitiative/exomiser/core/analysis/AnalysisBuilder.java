@@ -102,6 +102,11 @@ public class AnalysisBuilder implements FluentAnalysisBuilder<Analysis> {
         return this;
     }
 
+    public AnalysisBuilder postScoringBlendedBoqa(boolean postScoringBlendedBoqa) {
+        builder.postScoringBlendedBoqa(postScoringBlendedBoqa);
+        return this;
+    }
+
     //Filters
 
     /**

@@ -49,12 +49,20 @@ public class AnalysisFactory {
     private final GenomeAnalysisServiceProvider genomeAnalysisServiceProvider;
     private final PriorityFactory priorityFactory;
     private final OntologyService ontologyService;
+    private final PostScoringBlendedBoqaSupport postScoringBlendedBoqaSupport;
 
     @Autowired
-    public AnalysisFactory(GenomeAnalysisServiceProvider genomeAnalysisServiceProvider, PriorityFactory priorityFactory, OntologyService ontologyService) {
+    public AnalysisFactory(GenomeAnalysisServiceProvider genomeAnalysisServiceProvider, PriorityFactory priorityFactory,
+                           OntologyService ontologyService, PostScoringBlendedBoqaSupport postScoringBlendedBoqaSupport) {
         this.genomeAnalysisServiceProvider = genomeAnalysisServiceProvider;
         this.priorityFactory = priorityFactory;
         this.ontologyService = ontologyService;
+        this.postScoringBlendedBoqaSupport = postScoringBlendedBoqaSupport;
+    }
+
+    public AnalysisFactory(GenomeAnalysisServiceProvider genomeAnalysisServiceProvider, PriorityFactory priorityFactory,
+                           OntologyService ontologyService) {
+        this(genomeAnalysisServiceProvider, priorityFactory, ontologyService, null);
     }
 
     public AnalysisRunner getAnalysisRunner(GenomeAssembly genomeAssembly, AnalysisMode analysisMode) {
@@ -64,9 +72,9 @@ public class AnalysisFactory {
         GenomeAnalysisService genomeAnalysisService = genomeAnalysisServiceProvider.get(genomeAssembly);
 
         return switch (analysisMode) {
-            case FULL -> new SimpleAnalysisRunner(genomeAnalysisService);
+            case FULL -> new SimpleAnalysisRunner(genomeAnalysisService, postScoringBlendedBoqaSupport);
             // PASS_ONLY takes up the least RAM
-            case PASS_ONLY -> new PassOnlyAnalysisRunner(genomeAnalysisService);
+            case PASS_ONLY -> new PassOnlyAnalysisRunner(genomeAnalysisService, postScoringBlendedBoqaSupport);
         };
     }
 

@@ -105,6 +105,11 @@ public class AnalysisProtoBuilder implements FluentAnalysisBuilder<AnalysisProto
         return this;
     }
 
+    public AnalysisProtoBuilder postScoringBlendedBoqa(boolean postScoringBlendedBoqa) {
+        builder.setPostScoringBlendedBoqa(postScoringBlendedBoqa);
+        return this;
+    }
+
     private AnalysisProto.AnalysisStep.Builder stepBuilder() {
         return AnalysisProto.AnalysisStep.newBuilder();
     }

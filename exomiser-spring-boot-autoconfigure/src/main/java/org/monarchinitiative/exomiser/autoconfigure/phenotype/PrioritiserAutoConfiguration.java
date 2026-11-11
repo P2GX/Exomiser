@@ -25,25 +25,28 @@ import org.monarchinitiative.exomiser.autoconfigure.UndefinedDataDirectoryExcept
 import org.monarchinitiative.exomiser.core.prioritisers.PriorityFactory;
 import org.monarchinitiative.exomiser.core.prioritisers.util.DataMatrix;
 import org.monarchinitiative.exomiser.core.prioritisers.util.DataMatrixIO;
+import org.monarchinitiative.phenol.annotations.formats.hpo.HpoDiseases;
+import org.monarchinitiative.phenol.annotations.io.hpo.DiseaseDatabase;
+import org.monarchinitiative.phenol.annotations.io.hpo.HpoDiseaseLoader;
+import org.monarchinitiative.phenol.annotations.io.hpo.HpoDiseaseLoaderOptions;
+import org.monarchinitiative.phenol.annotations.io.hpo.HpoDiseaseLoaders;
+import org.monarchinitiative.phenol.io.OntologyLoader;
+import org.monarchinitiative.phenol.ontology.data.Ontology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.*;
 
 import java.io.IOException;
 import java.nio.file.DirectoryIteratorException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author Jules Jacobsen <j.jacobsen@qmul.ac.uk>
@@ -147,6 +150,37 @@ public class PrioritiserAutoConfiguration {
         logger.debug("hpoAnnotationFilePath: {}", hpoAnnotationFilePath.toAbsolutePath());
         return hpoAnnotationFilePath;
     }
+
+    @Bean
+    @Lazy
+    @ConditionalOnMissingBean(name = "hpoOntology")
+    public Ontology hpoOntology() {
+        Path hpoFilePath = phenotypeDataDirectory().resolve("hp.json");
+        Ontology hpoOntology = OntologyLoader.loadOntology(hpoFilePath.toFile());
+        logger.debug("Ontology loaded successfully from {}", hpoFilePath);
+        return hpoOntology;
+    }
+
+    @Bean
+    @Lazy
+    HpoDiseases hpoDiseases(Ontology hpOntology) {
+         Path hpoaFilePath = phenotypeDataDirectory().resolve("phenotype.hpoa");
+        logger.debug("Importing disease phenotype associations from file: {} ...", hpoaFilePath);
+        try {
+            //diseaseData = DiseaseDataParser.parseDiseaseDataFromHpoa(hpoaFilePath);
+            Set<DiseaseDatabase> diseaseDatabase = Set.of("OMIM").stream()
+                    .map(DiseaseDatabase::fromString)
+                    .collect(Collectors.toSet());
+            HpoDiseaseLoaderOptions options = HpoDiseaseLoaderOptions.of(diseaseDatabase,false, 100);
+            HpoDiseaseLoader loader = HpoDiseaseLoaders.defaultLoader(hpoOntology(), options);
+            HpoDiseases diseases = loader.load(hpoaFilePath);
+            return diseases;
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        
+    }
+
 
     /**
      * This needs a lot of RAM and is slow to create from the randomWalkFile, so

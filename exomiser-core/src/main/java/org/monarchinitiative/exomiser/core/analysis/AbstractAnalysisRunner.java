@@ -20,6 +20,7 @@
 
 package org.monarchinitiative.exomiser.core.analysis;
 
+import de.charite.compbio.jannovar.mendel.ModeOfInheritance;
 import org.monarchinitiative.exomiser.core.analysis.sample.PedigreeSampleValidator;
 import org.monarchinitiative.exomiser.core.analysis.sample.Sample;
 import org.monarchinitiative.exomiser.core.analysis.score.*;
@@ -30,6 +31,14 @@ import org.monarchinitiative.exomiser.core.model.*;
 import org.monarchinitiative.exomiser.core.pedigree.Pedigree;
 import org.monarchinitiative.exomiser.core.prioritisers.Prioritiser;
 import org.monarchinitiative.exomiser.core.prioritisers.PriorityType;
+import org.monarchinitiative.exomiser.core.prioritisers.model.InheritanceMode;
+import org.monarchinitiative.phenol.ontology.data.TermId;
+import org.p2gx.boqa.core.PatientData;
+import org.p2gx.boqa.core.analysis.BoqaBlendedExomiserAnalyser;
+import org.p2gx.boqa.core.analysis.CandidateResult;
+import org.p2gx.boqa.core.analysis.PatientAnalysisResult;
+import org.p2gx.boqa.core.diseases.TargetDisease;
+import org.p2gx.boqa.core.output.JsonResultWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +54,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toConcurrentMap;
+import static java.util.stream.Collectors.toSet;
 
 /**
  * @author Jules Jacobsen <jules.jacobsen@sanger.ac.uk>
@@ -54,15 +64,22 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
     private static final Logger logger = LoggerFactory.getLogger(AbstractAnalysisRunner.class);
 
     private final GenomeAnalysisService genomeAnalysisService;
+    private final PostScoringBlendedBoqaSupport postScoringBlendedBoqaSupport;
 
     protected final VariantFilterRunner variantFilterRunner;
     private final GeneFilterRunner geneFilterRunner;
 
     protected AbstractAnalysisRunner(GenomeAnalysisService genomeAnalysisService, VariantFilterRunner variantFilterRunner, GeneFilterRunner geneFilterRunner) {
-        this.genomeAnalysisService = genomeAnalysisService;
+        this(genomeAnalysisService, variantFilterRunner, geneFilterRunner, null);
+    }
 
+    protected AbstractAnalysisRunner(GenomeAnalysisService genomeAnalysisService, VariantFilterRunner variantFilterRunner,
+                                     GeneFilterRunner geneFilterRunner,
+                                     PostScoringBlendedBoqaSupport postScoringBlendedBoqaSupport) {
+        this.genomeAnalysisService = genomeAnalysisService;
         this.variantFilterRunner = variantFilterRunner;
         this.geneFilterRunner = geneFilterRunner;
+        this.postScoringBlendedBoqaSupport = postScoringBlendedBoqaSupport;
     }
 
     @Override
@@ -134,6 +151,7 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
 
         logger.info("Scoring genes");
         List<Gene> genes = geneScorer.scoreGenes(genesToScore);
+        writePostScoringBlendedBoqaResults(analysis, sample.hpoIds(), genes);
         List<VariantEvaluation> variants = variantsLoaded ? getFinalVariantList(variantEvaluations) : List.of();
 
         logger.info("Analysed sample {} with {} genes containing {} filtered variants", probandIdentifier, genes.size(), variants.size());
@@ -382,6 +400,58 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
     private void runPrioritiserStep(Prioritiser<?> prioritiser, List<String> hpoIds, List<Gene> genes) {
         logger.info("Running Prioritiser: {}", prioritiser);
         prioritiser.prioritizeGenes(hpoIds, genes);
+    }
+
+    private void writePostScoringBlendedBoqaResults(Analysis analysis, List<String> hpoIds, List<Gene> genes) {
+        if (!analysis.postScoringBlendedBoqa()) {
+            return;
+        }
+        if (postScoringBlendedBoqaSupport == null) {
+            throw new IllegalStateException("Post-scoring blended BOQA support has not been configured");
+        }
+
+        List<TargetDisease.PhenotypeAndGene> targetDiseases = getBlendedBoqaTargetDiseases(genes);
+        logger.info("Post-scoring blended BOQA: {} target diseases from {} scored genes", targetDiseases.size(), genes.size());
+
+        PatientData patientData = PatientData.fromObservedHpoTermList(hpoIds);
+        BoqaBlendedExomiserAnalyser analyser = new BoqaBlendedExomiserAnalyser(
+                postScoringBlendedBoqaSupport.hpo(), postScoringBlendedBoqaSupport.hpoDiseases());
+        List<CandidateResult> candidateResults = analyser.computeBlendedBoqaResults(patientData, targetDiseases);
+
+        logger.info("Post-scoring blended BOQA: {} candidate results", candidateResults.size());
+        PatientAnalysisResult patientAnalysisResult = new PatientAnalysisResult(patientData, candidateResults);
+        new JsonResultWriter().minimalisticWriteResults(
+                List.of(patientAnalysisResult),
+                Path.of("/Users/leonardo/git/boqa_exomiser_output/blended_exoboqa_writer/"
+                        + patientData.getID() + "_post_scoring.json"),
+                false);
+    }
+
+    private List<TargetDisease.PhenotypeAndGene> getBlendedBoqaTargetDiseases(List<Gene> genes) {
+        List<TargetDisease.PhenotypeAndGene> targetDiseases = new ArrayList<>();
+        for (Gene gene : genes) {
+            for (var disease : postScoringBlendedBoqaSupport.priorityService()
+                    .getDiseaseDataAssociatedWithGeneId(gene.entrezGeneId())) {
+                for (ModeOfInheritance modeOfInheritance : disease.inheritanceMode().toModeOfInheritance()) {
+                    if (!geneCompatibleWithInheritanceMode(gene, disease.inheritanceMode(), modeOfInheritance)
+                            || gene.geneScoreForMode(modeOfInheritance).combinedScore() <= 0.80) {
+                        continue;
+                    }
+                    targetDiseases.add(new TargetDisease.PhenotypeAndGene(
+                            disease.diseaseId(), disease.diseaseName(), gene.geneId(), gene.geneSymbol(),
+                            disease.phenotypeIds().stream().map(TermId::of).collect(toSet())));
+                }
+            }
+        }
+        return targetDiseases;
+    }
+
+    private boolean geneCompatibleWithInheritanceMode(Gene gene, InheritanceMode inheritanceMode,
+                                                      ModeOfInheritance currentMode) {
+        if (gene.compatibleInheritanceModes().isEmpty() || inheritanceMode == InheritanceMode.UNKNOWN) {
+            return true;
+        }
+        return gene.isCompatibleWith(currentMode) && inheritanceMode.isCompatibleWith(currentMode);
     }
 
     /**

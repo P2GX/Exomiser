@@ -40,6 +40,7 @@ message Analysis {
     repeated string frequency_sources = 8;
     repeated string pathogenicity_sources = 9;
     repeated AnalysisStep steps = 10;
+    bool post_scoring_blended_boqa = 11;
 }
 
 enum InheritanceMode {
@@ -76,5 +77,4 @@ message AnalysisStep {
         ExomeWalkerPrioritiser exome_walker_prioritiser = 16;
     }
 }
-
 

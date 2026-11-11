@@ -37,7 +37,11 @@ import java.util.function.Predicate;
 class SimpleAnalysisRunner extends AbstractAnalysisRunner {
 
     SimpleAnalysisRunner(GenomeAnalysisService genomeAnalysisService) {
-        super(genomeAnalysisService, new SimpleVariantFilterRunner(), new SimpleGeneFilterRunner());
+        this(genomeAnalysisService, null);
+    }
+
+    SimpleAnalysisRunner(GenomeAnalysisService genomeAnalysisService, PostScoringBlendedBoqaSupport postScoringBlendedBoqaSupport) {
+        super(genomeAnalysisService, new SimpleVariantFilterRunner(), new SimpleGeneFilterRunner(), postScoringBlendedBoqaSupport);
     }
 
     @Override

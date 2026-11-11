@@ -185,7 +185,8 @@ public class JobParser {
                 .inheritanceModes(inheritanceModeOptions)
                 .analysisMode(parseAnalysisMode(protoAnalysis.getAnalysisMode()))
                 .frequencySources(frequencySources)
-                .pathogenicitySources(pathogenicitySources);
+                .pathogenicitySources(pathogenicitySources)
+                .postScoringBlendedBoqa(protoAnalysis.getPostScoringBlendedBoqa());
 
         for (AnalysisProto.AnalysisStep analysisStep : protoAnalysis.getStepsList()) {
             addAnalysisStep(analysisBuilder, inheritanceModeOptions, frequencySources, pathogenicitySources, analysisStep);

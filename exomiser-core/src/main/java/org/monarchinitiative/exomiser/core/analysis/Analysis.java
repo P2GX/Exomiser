@@ -61,6 +61,7 @@ public record Analysis(
         InheritanceModeOptions inheritanceModeOptions,
         Set<FrequencySource> frequencySources,
         Set<PathogenicitySource> pathogenicitySources,
+        boolean postScoringBlendedBoqa,
         @JsonProperty("steps")
         List<AnalysisStep> analysisSteps
 ) {
@@ -127,6 +128,7 @@ public record Analysis(
                 .analysisMode(analysisMode)
                 .frequencySources(frequencySources)
                 .pathogenicitySources(pathogenicitySources)
+                .postScoringBlendedBoqa(postScoringBlendedBoqa)
                 .steps(analysisSteps);
     }
 
@@ -136,6 +138,7 @@ public record Analysis(
         private InheritanceModeOptions inheritanceModeOptions = InheritanceModeOptions.empty();
         private Set<FrequencySource> frequencySources = EnumSet.noneOf(FrequencySource.class);
         private Set<PathogenicitySource> pathogenicitySources = EnumSet.noneOf(PathogenicitySource.class);
+        private boolean postScoringBlendedBoqa;
         private List<AnalysisStep> analysisSteps = new ArrayList<>();
 
         public Analysis build() {
@@ -144,6 +147,7 @@ public record Analysis(
                     inheritanceModeOptions,
                     frequencySources,
                     pathogenicitySources,
+                    postScoringBlendedBoqa,
                     analysisSteps
             );
         }
@@ -172,6 +176,11 @@ public record Analysis(
 
         public Builder pathogenicitySources(Set<PathogenicitySource> pathogenicitySources) {
             this.pathogenicitySources = Objects.requireNonNull(pathogenicitySources);
+            return this;
+        }
+
+        public Builder postScoringBlendedBoqa(boolean postScoringBlendedBoqa) {
+            this.postScoringBlendedBoqa = postScoringBlendedBoqa;
             return this;
         }
 

@@ -69,6 +69,21 @@
             <artifactId>jblas</artifactId>
             <version>1.2.3</version>
         </dependency>
+        <dependency>
+            <groupId>org.monarchinitiative.phenol</groupId>
+            <artifactId>phenol-core</artifactId>
+            <version>2.1.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.monarchinitiative.phenol</groupId>
+            <artifactId>phenol-annotations</artifactId>
+            <version>2.1.4</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.p2gx.boqa</groupId>
+            <artifactId>boqa-core</artifactId>
+            <version>0.2.5</version>
+        </dependency>
         <!--Phenix dependencies:-->
         <!-- possibly could be replaced by org.monarchinitiative.phenol. If these artefacts are missing from the
         local .m2 repo they can be installed using the phenix-repository module. This should however happen in the

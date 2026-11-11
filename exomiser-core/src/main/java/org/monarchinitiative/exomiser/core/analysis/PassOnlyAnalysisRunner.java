@@ -38,7 +38,11 @@ import java.util.stream.Collectors;
 class PassOnlyAnalysisRunner extends AbstractAnalysisRunner {
 
     PassOnlyAnalysisRunner(GenomeAnalysisService genomeAnalysisService) {
-        super(genomeAnalysisService, new SparseVariantFilterRunner(), new SimpleGeneFilterRunner());
+        this(genomeAnalysisService, null);
+    }
+
+    PassOnlyAnalysisRunner(GenomeAnalysisService genomeAnalysisService, PostScoringBlendedBoqaSupport postScoringBlendedBoqaSupport) {
+        super(genomeAnalysisService, new SparseVariantFilterRunner(), new SimpleGeneFilterRunner(), postScoringBlendedBoqaSupport);
     }
 
     @Override
