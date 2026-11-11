@@ -151,6 +151,7 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
 
         logger.info("Scoring genes");
         List<Gene> genes = geneScorer.scoreGenes(genesToScore);
+        logger.info("Length of List<Gene>: {}", genes.size());
         writePostScoringBlendedBoqaResults(analysis, sample.hpoIds(), genes);
         List<VariantEvaluation> variants = variantsLoaded ? getFinalVariantList(variantEvaluations) : List.of();
 
@@ -434,12 +435,14 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
                     .getDiseaseDataAssociatedWithGeneId(gene.entrezGeneId())) {
                 for (ModeOfInheritance modeOfInheritance : disease.inheritanceMode().toModeOfInheritance()) {
                     if (!geneCompatibleWithInheritanceMode(gene, disease.inheritanceMode(), modeOfInheritance)
-                            || gene.geneScoreForMode(modeOfInheritance).combinedScore() <= 0.80) {
+                            || gene.geneScoreForMode(modeOfInheritance).combinedScore() <= 0.45) {
                         continue;
                     }
-                    targetDiseases.add(new TargetDisease.PhenotypeAndGene(
-                            disease.diseaseId(), disease.diseaseName(), gene.geneId(), gene.geneSymbol(),
-                            disease.phenotypeIds().stream().map(TermId::of).collect(toSet())));
+                    if (disease.diseaseId().startsWith("OMIM")){
+                        targetDiseases.add(new TargetDisease.PhenotypeAndGene(
+                                disease.diseaseId(), disease.diseaseName(), gene.geneId(), gene.geneSymbol(),
+                                disease.phenotypeIds().stream().map(TermId::of).collect(toSet())));
+                        }
                 }
             }
         }
