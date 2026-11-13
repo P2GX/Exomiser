@@ -152,6 +152,7 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
         logger.info("Scoring genes");
         List<Gene> genes = geneScorer.scoreGenes(genesToScore);
         logger.info("Length of List<Gene>: {}", genes.size());
+
         writePostScoringBlendedBoqaResults(analysis, sample.hpoIds(), genes);
         List<VariantEvaluation> variants = variantsLoaded ? getFinalVariantList(variantEvaluations) : List.of();
 
@@ -430,24 +431,51 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
 
     private List<TargetDisease.PhenotypeAndGene> getBlendedBoqaTargetDiseases(List<Gene> genes) {
         List<TargetDisease.PhenotypeAndGene> targetDiseases = new ArrayList<>();
+
         for (Gene gene : genes) {
             for (var disease : postScoringBlendedBoqaSupport.priorityService()
                     .getDiseaseDataAssociatedWithGeneId(gene.entrezGeneId())) {
+
+                // TODO is this OK?
+                if (!disease.diseaseId().startsWith("OMIM")){
+                    continue;
+                }
+
                 for (ModeOfInheritance modeOfInheritance : disease.inheritanceMode().toModeOfInheritance()) {
-                    if (!geneCompatibleWithInheritanceMode(gene, disease.inheritanceMode(), modeOfInheritance)
-                            || gene.geneScoreForMode(modeOfInheritance).combinedScore() <= 0.45) {
+
+                    var geneScore = gene.geneScoreForMode(modeOfInheritance);
+                    double variantScore = geneScore.variantScore();
+
+                    logger.debug(
+                            "BLENDED BOQA GENE: {} MOI: {} variantScore: {}",
+                            gene.geneSymbol(),
+                            modeOfInheritance,
+                            variantScore
+                    );
+
+                    if (!geneCompatibleWithInheritanceMode(
+                            gene,
+                            disease.inheritanceMode(),
+                            modeOfInheritance)
+                            || variantScore < 0.9) {
                         continue;
                     }
-                    if (disease.diseaseId().startsWith("OMIM")){
-                        targetDiseases.add(new TargetDisease.PhenotypeAndGene(
-                                disease.diseaseId(), disease.diseaseName(), gene.geneId(), gene.geneSymbol(),
-                                disease.phenotypeIds().stream().map(TermId::of).collect(toSet())));
-                        }
+
+                    targetDiseases.add(new TargetDisease.PhenotypeAndGene(
+                            disease.diseaseId(),
+                            disease.diseaseName(),
+                            gene.geneId(),
+                            gene.geneSymbol(),
+                            disease.phenotypeIds().stream()
+                                    .map(TermId::of)
+                                    .collect(toSet())));
                 }
             }
         }
         return targetDiseases;
     }
+
+
 
     private boolean geneCompatibleWithInheritanceMode(Gene gene, InheritanceMode inheritanceMode,
                                                       ModeOfInheritance currentMode) {
