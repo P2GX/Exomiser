@@ -153,7 +153,7 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
         List<Gene> genes = geneScorer.scoreGenes(genesToScore);
         logger.info("Length of List<Gene>: {}", genes.size());
 
-        writePostScoringBlendedBoqaResults(analysis, sample.hpoIds(), genes);
+        writePostScoringBlendedBoqaResults(analysis, sample, genes);
         List<VariantEvaluation> variants = variantsLoaded ? getFinalVariantList(variantEvaluations) : List.of();
 
         logger.info("Analysed sample {} with {} genes containing {} filtered variants", probandIdentifier, genes.size(), variants.size());
@@ -244,16 +244,16 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
         // this can be done using parallel which dramatically reduces runtime at the expense of RAM and
         //  inability to scale past one job running on one machine
         try (Stream<VariantEvaluation> variantStream = variantFactory.createVariantEvaluations()) {
-                    filteredVariants = variantStream
+            filteredVariants = variantStream
 //                        .parallel()
-                        .peek(variantLogger.logLoadedAndPassedVariants())
-                        .filter(isObservedInProband(probandIdentifier))
-                        .map(geneReassigner::reassignRegulatoryAndNonCodingVariantAnnotations)
-                        .map(flagWhiteListedVariants())
-                        .filter(isAssociatedWithKnownGene(allGenes))
-                        .filter(runVariantFilters(variantFilters))
-                        .peek(variantLogger.countPassedVariant())
-                        .toList();
+                    .peek(variantLogger.logLoadedAndPassedVariants())
+                    .filter(isObservedInProband(probandIdentifier))
+                    .map(geneReassigner::reassignRegulatoryAndNonCodingVariantAnnotations)
+                    .map(flagWhiteListedVariants())
+                    .filter(isAssociatedWithKnownGene(allGenes))
+                    .filter(runVariantFilters(variantFilters))
+                    .peek(variantLogger.countPassedVariant())
+                    .toList();
         }
         variantLogger.logResults();
         return filteredVariants;
@@ -404,7 +404,7 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
         prioritiser.prioritizeGenes(hpoIds, genes);
     }
 
-    private void writePostScoringBlendedBoqaResults(Analysis analysis, List<String> hpoIds, List<Gene> genes) {
+    private void writePostScoringBlendedBoqaResults(Analysis analysis, Sample sample, List<Gene> genes) {
         if (!analysis.postScoringBlendedBoqa()) {
             return;
         }
@@ -415,7 +415,7 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
         List<TargetDisease.PhenotypeAndGene> targetDiseases = getBlendedBoqaTargetDiseases(genes);
         logger.info("Post-scoring blended BOQA: {} target diseases from {} scored genes", targetDiseases.size(), genes.size());
 
-        PatientData patientData = PatientData.fromObservedHpoTermList(hpoIds);
+        PatientData patientData = PatientData.fromObservedHpoTermList(sample.probandSampleName(), sample.hpoIds());
         BoqaBlendedExomiserAnalyser analyser = new BoqaBlendedExomiserAnalyser(
                 postScoringBlendedBoqaSupport.hpo(), postScoringBlendedBoqaSupport.hpoDiseases());
         List<CandidateResult> candidateResults = analyser.computeBlendedBoqaResults(patientData, targetDiseases);
