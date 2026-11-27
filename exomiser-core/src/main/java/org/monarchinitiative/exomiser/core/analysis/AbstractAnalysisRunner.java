@@ -42,7 +42,9 @@ import org.p2gx.boqa.core.output.JsonResultWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -422,11 +424,22 @@ abstract class AbstractAnalysisRunner implements AnalysisRunner {
 
         logger.info("Post-scoring blended BOQA: {} candidate results", candidateResults.size());
         PatientAnalysisResult patientAnalysisResult = new PatientAnalysisResult(patientData, candidateResults);
-        new JsonResultWriter().minimalisticWriteResults(
-                List.of(patientAnalysisResult),
-                Path.of("/Users/leonardo/git/boqa_exomiser_output/blended_exoboqa_writer/"
-                        + patientData.getID() + "_post_scoring.json"),
-                false);
+        Path outputDir = Path.of(System.getProperty("user.home"))
+                .resolve(".boqa_exomiser_output")
+                .resolve("exp_5_varscore0p9_with_plain_and_prior")
+                .resolve("single_files");
+
+        Path outputFile = outputDir.resolve(patientData.getID() + "_post_scoring.json");
+
+        try {
+            Files.createDirectories(outputDir);
+            new JsonResultWriter().minimalisticWriteResults(
+                    List.of(patientAnalysisResult),
+                    outputFile,
+                    false);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to write results to " + outputFile, e);
+        }
     }
 
     private List<TargetDisease.PhenotypeAndGene> getBlendedBoqaTargetDiseases(List<Gene> genes) {
